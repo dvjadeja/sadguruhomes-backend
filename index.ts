@@ -7,6 +7,8 @@ import { config } from "dotenv";
 import mongoose from "./setups/mongo";
 import { handleSuccess } from "./utils/response.utils";
 
+import { registerAdminRoutes } from "./routes";
+
 const db = mongoose.connection;
 db.on("error", (err) => console.log(`Something went wrong!`, err));
 db.once("open", function () {
@@ -19,6 +21,8 @@ config();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cors());
+
+registerAdminRoutes(app);
 
 app.get("/", (req: Request, res: Response) => {
   handleSuccess(res, {
