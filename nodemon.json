@@ -1,0 +1,7 @@
+{
+  "watch": ["."],
+  "ignore": ["server/**/*.spec.ts", "dist/*", "react/*"],
+  "exec": "ts-node -r tsconfig-paths/register index",
+  "verbose": true,
+  "extensions": [".ts"]
+}
