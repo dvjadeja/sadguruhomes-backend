@@ -1,16 +1,16 @@
-import express from "express";
+import express, { response } from "express";
 import { Request, Response } from "express";
+import path, { resolve } from "path";
 
 import cors from "cors";
 import { config } from "dotenv";
-import fileUpload from "express-fileupload";
-import { v2 as cloudinary } from "cloudinary";
 
 import mongoose from "./setups/mongo";
 import { handleErrors, handleSuccess } from "./utils/response.utils";
 
 import { registerAdminRoutes } from "./routes";
-import { checkRole, isAuthenticate } from "./middlewares";
+import { multerUploads, dataUri } from "./setups/multer";
+import { cloudinaryConfig, cloudinary } from "./setups/cloudinaryConfig";
 
 const db = mongoose.connection;
 db.on("error", (err) => console.log(`Something went wrong!`, err));
@@ -18,70 +18,84 @@ db.once("open", function () {
   console.log(`We're Connected with DB`);
 });
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_NAME,
-  api_key: process.env.CLOUDINARY_KEY,
-  api_secret: process.env.CLOUDINARY_SECRET,
-});
-
 const app = express();
 config();
 
+app.use(express.static(resolve(__dirname, "src/public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cors());
+app.use("*", cloudinaryConfig);
 
 registerAdminRoutes(app);
 
-app.use(
-  fileUpload({
-    useTempFiles: true,
-  })
+app.post(
+  "/api/v1/admin/upload",
+  multerUploads,
+  async (req: Request, res: Response) => {
+    try {
+      if (req.file) {
+        const file: any = dataUri(req).content;
+
+        return cloudinary.uploader
+          .upload(file)
+          .then((result) => {
+            const image = result;
+
+            handleSuccess(res, {
+              message: "Image uploaded successfully",
+              data: image,
+            });
+
+            // return res.status(200).json({
+            //   message: "Your Image has been uploaded successfully",
+            //   data: {
+            //     image,
+            //   },
+            // });
+          })
+          .catch((err) => {
+            res.status(400).json({
+              messge: "someting went wrong while processing your request",
+              data: {
+                err,
+              },
+            });
+          });
+      }
+    } catch (error) {}
+  }
 );
 
-app.post("/api/v1/admin/upload", isAuthenticate, checkRole(["ADMIN"]), async (req: Request, res: Response) => {
+app.post("/api/v1/admin/destroy", async (req: Request, res: Response) => {
   try {
-    const file: any = req.files?.image;
+    const { url } = req.body;
 
-    console.log("File :: ", file);
+    console.log("PUBLIC_ID :: ", path.parse(url).name);
+    cloudinary.uploader.destroy(
+      path.parse(url).name,
+      function (error: any, result: any) {
+        console.log("Response :: ", result, "Error :: ", error);
+        if (result.result === "ok") {
+          handleSuccess(res, {
+            status: 200,
+            message: "Successfully Deleted Image",
+          });
+        }
 
-    const result = await cloudinary.uploader.upload(file.tempFilePath, {
-      resource_type: "auto",
-      folder: "Home",
-    });
-
-    console.log("Result :: ", result);
-    handleSuccess(res, {
-      message: "File Uploaded Successfully",
-      data: result,
-    });
-  } catch (error) {
-    handleErrors(req, res, {
-      status: 500,
-      message: "Error uploading file",
-      error,
-    });
-  }
-});
-
-app.get('/api/v1/admin/destroy', isAuthenticate, checkRole(["ADMIN"]), async (req: Request, res: Response) => {
-  try {
-    const { public_id }: any = req.query
-
-    const response = await cloudinary.uploader.destroy(public_id);
-
-    console.log("Response :: ", response)
-    handleSuccess(res, {
-      message: "File Delete Successfully",
-    })
+        if (error) {
+          return;
+        }
+      }
+    );
   } catch (error) {
     handleErrors(req, res, {
       status: 500,
       message: "Error while Deleting Image",
-      error
-    })
+      error,
+    });
   }
-})
+});
 
 app.get("/", (req: Request, res: Response) => {
   handleSuccess(res, {
