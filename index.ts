@@ -1,6 +1,6 @@
 import express, { response } from "express";
 import { Request, Response } from "express";
-import path, { resolve } from "path";
+import path from "path";
 
 import cors from "cors";
 import { config } from "dotenv";
@@ -21,7 +21,7 @@ db.once("open", function () {
 const app = express();
 config();
 
-app.use(express.static(resolve(__dirname, "src/public")));
+// app.use(express.static(resolve(__dirname, "src/public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cors());
